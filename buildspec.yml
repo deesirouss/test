@@ -9,7 +9,6 @@ phases:
   install:
     runtime-versions:
       nodejs: 20
-      docker: 20
     commands:
       - echo Installing system dependencies...
       - apt-get update && apt-get install -y postgresql-client
