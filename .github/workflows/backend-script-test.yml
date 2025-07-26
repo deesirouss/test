@@ -20,6 +20,17 @@ jobs:
           -e POSTGRES_PASSWORD=cicd_password \
           -p 5432:5432 postgres:15-alpine
 
+    - name: Wait for PostgreSQL to be ready
+      run: |
+        for i in {1..10}; do
+          if docker exec cicd-postgres pg_isready -U cicd_user; then
+            echo "PostgreSQL is ready!"
+            break
+          fi
+          echo "Waiting for PostgreSQL..."
+          sleep 3
+        done
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -27,14 +38,12 @@ jobs:
         cache: 'npm'
         cache-dependency-path: backend/package-lock.json
 
-    - name: Install dependencies
+    - name: Install dependencies & migrations
       working-directory: ./backend
-      run: cp .env.example .env && \
-        npm install --only=production && npm cache clean --force
-
-    - name: Run database migrations
-      working-directory: ./backend
-      run: npm run migrate
+      run: |
+        cp .env.example .env
+        npm install
+        npm run migrate
 
     - name: Run all tests with coverage
       working-directory: ./backend
