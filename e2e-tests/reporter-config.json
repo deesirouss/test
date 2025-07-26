@@ -1,0 +1,19 @@
+{
+  "reporterEnabled": "cypress-mochawesome-reporter, mocha-junit-reporter",
+  "cypressMochawesomeReporterReporterOptions": {
+    "charts": true,
+    "reportPageTitle": "CICD Workshop Test Report",
+    "embeddedScreenshots": true,
+    "inlineAssets": true,
+    "saveAllAttempts": false,
+    "reportDir": "cypress/reports",
+    "overwrite": false,
+    "html": true,
+    "saveJson": true
+  },
+  "mochaJunitReporterReporterOptions": {
+    "mochaFile": "cypress/reports/junit/test-results.[hash].xml",
+    "toConsole": false,
+    "testCaseSwitchClassnameAndName": true
+  }
+}

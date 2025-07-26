@@ -1,0 +1,70 @@
+# Define custom network for service communication
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: cicd-postgres
+    environment:
+      - POSTGRES_DB=cicd_workshop
+      - POSTGRES_USER=cicd_user
+      - POSTGRES_PASSWORD=cicd_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cicd_user -d cicd_workshop"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Backend API service
+  backend:
+    build: ./backend
+    container_name: cicd-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DATABASE_URL=postgresql://cicd_user:cicd_password@postgres:5432/cicd_workshop
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    # Health check for container orchestration
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # Restart policy for production reliability
+    restart: unless-stopped
+
+  # Frontend React application
+  frontend:
+    build: ./frontend
+    container_name: cicd-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      # Use internal network communication
+      - REACT_APP_API_URL=http://backend:3001/api
+    networks:
+      - app-network
+    restart: unless-stopped

@@ -1,0 +1,37 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Build output
+build
+
+# Tests
+src/tests
+coverage
+*.test.js
+*.spec.js
+
+# Development files
+.env.local
+.env.development.local
+.env.test.local
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# React specific
+public/manifest.json
+public/robots.txt
