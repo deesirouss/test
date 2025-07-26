@@ -1,0 +1,91 @@
+version: 0.2
+
+env:
+  variables:
+    NODE_ENV: test
+    DATABASE_URL: postgresql://cicd_user:cicd_password@localhost:5432/cicd_workshop
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+      docker: 20
+    commands:
+      - echo Installing system dependencies...
+      - apt-get update && apt-get install -y postgresql-client
+    on-failure: ABORT
+
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - echo Starting PostgreSQL for tests...
+      - |
+        docker run -d --name test-postgres \
+          -e POSTGRES_USER=cicd_user \
+          -e POSTGRES_PASSWORD=cicd_password \
+          -e POSTGRES_DB=cicd_workshop \
+          -p 5432:5432 \
+          --health-cmd="pg_isready -U cicd_user -d cicd_workshop" \
+          --health-interval=10s \
+          --health-timeout=5s \
+          --health-retries=5 \
+          postgres:15-alpine
+      - echo Waiting for PostgreSQL to be ready...
+      - |
+        timeout 60 bash -c 'until docker exec test-postgres pg_isready -U cicd_user -d cicd_workshop; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done'
+    on-failure: ABORT
+
+  build:
+    commands:
+      - echo Build started on $(date)
+      - echo Installing backend dependencies...
+      - cd backend
+      - |
+        if [ ! -f .env.example ]; then
+          echo "Error: .env.example not found"
+          exit 1
+        fi
+      - cp .env.example .env
+      - npm ci
+      - npm run migrate
+      - echo Running tests...
+      - npm test -- --coverage --watchAll=false
+      - echo Building Docker image...
+      - IMAGE_TAG=$ENV
+      - ECR_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPOSITORY
+      - docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+      - docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_URI:$IMAGE_TAG
+      - docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_URI:latest
+    on-failure: ABORT
+
+  post_build:
+    commands:
+      - echo Build completed on $(date)
+      - echo "Pushing Docker image..."
+      - docker push $ECR_URI:$IMAGE_TAG
+      - docker push $ECR_URI:latest
+      - echo "Deploying to EC2..."
+      - |
+        aws ssm send-command \
+          --document-name "AWS-RunShellScript" \
+          --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"$EC2_INSTANCE_ID\"]}]" \
+          --parameters "{\"commands\":[\"sudo /root/deployment/deployment_script.sh\"]}" \
+          --region $AWS_DEFAULT_REGION
+    on-failure: ABORT
+    finally:
+      - echo Cleaning up...
+      - docker stop test-postgres || true
+      - docker rm test-postgres || true
+
+cache:
+  paths:
+    - 'backend/node_modules/**/*'
+
+artifacts:
+  files:
+    - backend/coverage/**/*
+  name: backend-artifacts
