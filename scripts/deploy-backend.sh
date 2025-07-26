@@ -94,39 +94,11 @@ push_image() {
 deploy_to_ec2() {
     echo "Deploying to EC2..."
     
-    local branch_name="${GITHUB_REF#refs/heads/}"
-    local image_tag="$branch_name-latest"
-    
-    # Create deployment script
-    local script_content=$(cat <<EOF
-#!/bin/bash
-LOG_FILE="/var/log/cicd-backend-deployment.log"
-echo "=== Backend Deployment Started at \$(date) ===" > \$LOG_FILE
-if docker ps -q -f name=cicd-backend; then
-    echo "Stopping existing cicd-backend container..." | tee -a \$LOG_FILE
-    docker stop cicd-backend 2>&1 | tee -a \$LOG_FILE
-fi
-if docker ps -aq -f name=cicd-backend; then
-    echo "Removing existing cicd-backend container..." | tee -a \$LOG_FILE
-    docker rm cicd-backend 2>&1 | tee -a \$LOG_FILE
-fi
-echo "Cleaning up old images..." | tee -a \$LOG_FILE
-docker images --format "table {{.Repository}}:{{.Tag}}" | grep "$ECR_REGISTRY/$ECR_REPOSITORY" | grep -v "$image_tag" | xargs -r docker rmi 2>&1 | tee -a \$LOG_FILE || true
-echo "Logging into ECR..." | tee -a \$LOG_FILE
-aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY 2>&1 | tee -a \$LOG_FILE
-echo "Pulling latest image..." | tee -a \$LOG_FILE
-docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$image_tag 2>&1 | tee -a \$LOG_FILE
-echo "Starting new cicd-backend container..." | tee -a \$LOG_FILE
-docker run -d --name cicd-backend --restart unless-stopped -p 3001:3001 -e NODE_ENV=production -e PORT=3001 -e DATABASE_URL=$DB_URL $ECR_REGISTRY/$ECR_REPOSITORY:$image_tag 2>&1 | tee -a \$LOG_FILE
-echo "Backend deployment completed successfully at \$(date)!" | tee -a \$LOG_FILE
-echo "=== Deployment Log End ===" >> \$LOG_FILE
-EOF
-)
     
     if ! aws ssm send-command \
       --document-name "AWS-RunShellScript" \
       --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"$EC2_INSTANCE_ID\"]}]" \
-      --parameters "{\"commands\":[\"echo '$script_content' > /tmp/deploy.sh\", \"chmod +x /tmp/deploy.sh\", \"/tmp/deploy.sh\"]}" \
+      --parameters "{\"commands\":[\"sudo su - root -c '/root/deployment/deployment_script.sh'\"]}" \
       --region "$AWS_REGION"; then
         print_error "EC2 deployment failed"
         exit 1
