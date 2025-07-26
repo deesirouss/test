@@ -26,7 +26,7 @@ print_warning() {
 
 # Check required environment variables
 check_env_vars() {
-    local required_vars=("AWS_REGION" "ECR_REPOSITORY" "IMAGE_TAG" "EC2_HOST" "EC2_USER" "DATABASE_URL")
+    local required_vars=("AWS_REGION" "ECR_REPOSITORY" "GITHUB_SHA" "ECR_REGISTRY" "EC2_INSTANCE_ID")
     
     for var in "${required_vars[@]}"; do
         if [[ -z "${!var}" ]]; then
