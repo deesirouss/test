@@ -1,32 +1,32 @@
-name: Backend Deployment
+# name: Backend Deployment
 
-on:
-  push:
-    branches: [ main ]
-    paths: [ 'backend/**', '.github/**', 'scripts/**' ]
+# on:
+#   push:
+#     branches: [ main ]
+#     paths: [ 'backend/**', '.github/**', 'scripts/**' ]
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
 
-    steps:
-    - uses: actions/checkout@v4
+#     steps:
+    # - uses: actions/checkout@v4
       
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-        aws-region: us-east-1
+    # - name: Configure AWS credentials
+    #   uses: aws-actions/configure-aws-credentials@v4
+    #   with:
+    #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    #     aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+    #     aws-region: us-east-1
 
-    - name: Run Backend Deployment Script
-      env:
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-        GITHUB_SHA: ${{ github.sha }}
-        ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-        EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
-      run: |
-        chmod +x ./scripts/deploy-backend.sh
-        ./scripts/deploy-backend.sh
+    # - name: Run Backend Deployment Script
+    #   env:
+    #     AWS_REGION: ${{ secrets.AWS_REGION }}
+#         ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+#         GITHUB_SHA: ${{ github.sha }}
+#         ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+#         EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+#       run: |
+#         chmod +x ./scripts/deploy-backend.sh
+#         ./scripts/deploy-backend.sh
