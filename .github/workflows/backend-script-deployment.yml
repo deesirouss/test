@@ -27,7 +27,6 @@ jobs:
         GITHUB_SHA: ${{ github.sha }}
         ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
         EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
-        DB_URL: ${{ secrets.DATABASE_URL }}
       run: |
         chmod +x ./scripts/deploy-backend.sh
         ./scripts/deploy-backend.sh
