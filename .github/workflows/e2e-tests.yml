@@ -6,7 +6,7 @@ on:
 #     paths: [ 'e2e-tests/**', '.github/**' ]
   workflow_run:
     workflows:
-      - Frontend Deployment
+      - Frontend Deploy
     types:
       - completed
   workflow_dispatch:
