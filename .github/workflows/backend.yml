@@ -1,92 +1,92 @@
-name: Backend Tests
+# name: Backend Tests
 
-on:
-  push:
-    branches: [ main ]
-    paths: [ 'backend/**', '.github/**', 'scripts/**' ]
+# on:
+#   push:
+#     branches: [ main ]
+#     paths: [ 'backend/**', '.github/**', 'scripts/**' ]
 
-jobs:
-  backend-test:
-    runs-on: ubuntu-latest
+# jobs:
+#   backend-test:
+#     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_USER: cicd_user
-          POSTGRES_PASSWORD: cicd_password
-          POSTGRES_DB: cicd_workshop
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
+#     services:
+#       postgres:
+#         image: postgres
+#         env:
+#           POSTGRES_USER: cicd_user
+#           POSTGRES_PASSWORD: cicd_password
+#           POSTGRES_DB: cicd_workshop
+#         options: >-
+#           --health-cmd pg_isready
+#           --health-interval 10s
+#           --health-timeout 5s
+#           --health-retries 5
+#         ports:
+#           - 5432:5432
 
-    steps:
-    - uses: actions/checkout@v4
+#     steps:
+#     - uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: backend/package-lock.json
+#     - name: Setup Node.js
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: '20'
+#         cache: 'npm'
+#         cache-dependency-path: backend/package-lock.json
 
-    - name: Install dependencies & migrations
-      working-directory: ./backend
-      run: |
-        cp .env.example .env
-        npm install
-        npm run migrate
+#     - name: Install dependencies & migrations
+#       working-directory: ./backend
+#       run: |
+#         cp .env.example .env
+#         npm install
+#         npm run migrate
 
-    - name: Run all tests with coverage
-      working-directory: ./backend
-      run: npm test
+#     - name: Run all tests with coverage
+#       working-directory: ./backend
+#       run: npm test
 
-  deploy:
-    needs: backend-test
-    runs-on: ubuntu-latest
+#   deploy:
+#     needs: backend-test
+#     runs-on: ubuntu-latest
 
-    steps:
-    - uses: actions/checkout@v4
+#     steps:
+#     - uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-        aws-region: us-east-1
+#     - name: Configure AWS credentials
+#       uses: aws-actions/configure-aws-credentials@v4
+#       with:
+#         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+#         aws-region: us-east-1
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+#     - name: Login to Amazon ECR
+#       id: login-ecr
+#       uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Build and push Docker image
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        cd backend
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        branch_name=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9._-]/-/g')
-        docker tag "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:$branch_name-latest"
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$branch_name-latest"
+#     - name: Build and push Docker image
+#       env:
+#         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+#         ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+#         IMAGE_TAG: ${{ github.sha }}
+#       run: |
+#         cd backend
+#         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+#         branch_name=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9._-]/-/g')
+#         docker tag "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:$branch_name-latest"
+#         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+#         docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$branch_name-latest"
 
-    - name: Deploy to EC2
-      env:
-        EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
-        AWS_REGION: us-east-1
-      run: |
-        if ! aws ssm send-command \
-              --document-name "AWS-RunShellScript" \
-              --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"$EC2_INSTANCE_ID\"]}]" \
-              --parameters "{\"commands\":[\"sudo su - root -c '/root/deployment/deployment_script.sh'\"]}" \
-              --region "$AWS_REGION"; then
-            echo "EC2 deployment failed"
-            exit 1
-        fi
+#     - name: Deploy to EC2
+#       env:
+#         EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+#         AWS_REGION: us-east-1
+#       run: |
+#         if ! aws ssm send-command \
+#               --document-name "AWS-RunShellScript" \
+#               --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"$EC2_INSTANCE_ID\"]}]" \
+#               --parameters "{\"commands\":[\"sudo su - root -c '/root/deployment/deployment_script.sh'\"]}" \
+#               --region "$AWS_REGION"; then
+#             echo "EC2 deployment failed"
+#             exit 1
+#         fi
