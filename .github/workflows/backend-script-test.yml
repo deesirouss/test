@@ -6,7 +6,7 @@ on:
     paths: [ 'backend/**', '.github/**', 'scripts/**' ]
 
 jobs:
-  test:
+  backend-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,7 +29,8 @@ jobs:
 
     - name: Install dependencies
       working-directory: ./backend
-      run: npm install --only=production && npm cache clean --force
+      run: cp .env.example .env && \
+        npm install --only=production && npm cache clean --force
 
     - name: Run database migrations
       working-directory: ./backend
@@ -38,22 +39,3 @@ jobs:
     - name: Run all tests with coverage
       working-directory: ./backend
       run: npm test
-
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-      
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
-
-    - name: Run Backend Deployment Script
-      run: |
-        chmod +x ./scripts/deploy-backend.sh
-        ./scripts/deploy-backend.sh
