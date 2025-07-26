@@ -92,12 +92,65 @@ push_image() {
 
 # Deploy to EC2
 deploy_to_ec2() {
-    echo "Logging in to EC2 and deploying..."
+    echo "Deploying to EC2..."
     
+    local branch_name="${GITHUB_REF#refs/heads/}"
+    local image_tag="$branch_name-latest"
+    
+    # Create deployment commands
+    local deployment_commands=$(cat <<'EOF'
+# Create log file with timestamp
+LOG_FILE="/var/log/cicd-backend-deployment.log"
+echo "=== Backend Deployment Started at $(date) ===" > $LOG_FILE
+
+# Stop and remove existing cicd-backend container if it exists
+if docker ps -q -f name=cicd-backend; then
+    echo "Stopping existing cicd-backend container..." | tee -a $LOG_FILE
+    docker stop cicd-backend 2>&1 | tee -a $LOG_FILE
+fi
+
+if docker ps -aq -f name=cicd-backend; then
+    echo "Removing existing cicd-backend container..." | tee -a $LOG_FILE
+    docker rm cicd-backend 2>&1 | tee -a $LOG_FILE
+fi
+
+# Remove old images (keep current one)
+echo "Cleaning up old images..." | tee -a $LOG_FILE
+docker images --format "table {{.Repository}}:{{.Tag}}" | grep "ECR_REGISTRY/ECR_REPOSITORY" | grep -v "IMAGE_TAG" | xargs -r docker rmi 2>&1 | tee -a $LOG_FILE || true
+
+# Login to ECR
+echo "Logging into ECR..." | tee -a $LOG_FILE
+aws ecr get-login-password --region AWS_REGION | docker login --username AWS --password-stdin ECR_REGISTRY 2>&1 | tee -a $LOG_FILE
+
+# Pull latest image
+echo "Pulling latest image..." | tee -a $LOG_FILE
+docker pull ECR_REGISTRY/ECR_REPOSITORY:IMAGE_TAG 2>&1 | tee -a $LOG_FILE
+
+# Run new container with all required environment variables
+echo "Starting new cicd-backend container..." | tee -a $LOG_FILE
+docker run -d \
+  --name cicd-backend \
+  --restart unless-stopped \
+  -p 3001:3001 \
+  -e NODE_ENV=production \
+  -e PORT=3001 \
+  -e DATABASE_URL=postgresql://cicd_user:cicd_password@localhost:5432/cicd_workshop \
+  ECR_REGISTRY/ECR_REPOSITORY:IMAGE_TAG 2>&1 | tee -a $LOG_FILE
+
+echo "Backend deployment completed successfully at $(date)!" | tee -a $LOG_FILE
+echo "=== Deployment Log End ===" >> $LOG_FILE
+EOF
+)
+    
+    # Replace placeholders with actual values
+    deployment_commands=${deployment_commands//ECR_REGISTRY/$ECR_REGISTRY}
+    deployment_commands=${deployment_commands//ECR_REPOSITORY/$ECR_REPOSITORY}
+    deployment_commands=${deployment_commands//IMAGE_TAG/$image_tag}
+    deployment_commands=${deployment_commands//AWS_REGION/$AWS_REGION}    
     if ! aws ssm send-command \
       --document-name "AWS-RunShellScript" \
       --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"$EC2_INSTANCE_ID\"]}]" \
-      --parameters "{\"commands\":[\"docker system prune -af\", \"docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\", \"docker run -d -p 3001:3001 $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\"]}" \
+      --parameters "{\"commands\":[\"$deployment_commands\"]}" \
       --region "$AWS_REGION"; then
         print_error "EC2 deployment failed"
         exit 1
