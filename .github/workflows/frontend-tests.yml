@@ -1,13 +1,14 @@
 name: Frontend Tests
 
 on:
-  pull_request:
+  push:
     branches: [ main ]
     paths: [ 'frontend/**', '.github/**' ]
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on:
+      - codebuild-cicd-workshop-qa-${{ github.run_id }}-${{ github.run_attempt }}
     
     steps:
     - uses: actions/checkout@v4
