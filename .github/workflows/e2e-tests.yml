@@ -1,82 +1,44 @@
 name: E2E Tests
 
 on:
-    # push:
-    #   branches: [ main ]
-    #   paths: [ 'e2e-tests/**', '.github/**' ]
-    workflow_run:
-        workflows: ["Backend CI/CD", "Frontend CI/CD"]
-        types:
-        - completed
-        branches: [ main ]
-    workflow_dispatch:
+#   push:
+#     branches: [ main ]
+#     paths: [ 'e2e-tests/**', '.github/**' ]
+  workflow_run:
+    workflows: ["Frontend Deployment"]
+    types:
+      - completed
+  workflow_dispatch:
 
 jobs:
   e2e-tests:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
-    
-    services:
-      backend:
-        image: node:18-alpine
-        ports:
-          - 3001:3001
-        options: --health-cmd="wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1" --health-interval=10s --health-timeout=5s --health-retries=3
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'push' }}
 
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-    
-    - name: Start Backend Service
-      working-directory: ./backend
-      run: |
-        npm ci
-        npm start &
-        sleep 10
-        curl -f http://localhost:3001/api/health || exit 1
-    
-    - name: Start Frontend Service
-      working-directory: ./frontend
-      run: |
-        npm ci
-        npm run build
-        npx serve -s build -l 3000 &
-        sleep 5
-    
+
     - name: Install E2E dependencies
       working-directory: ./e2e-tests
-      run: npm ci
-    
+      run: npm install
+
     - name: Run Cypress E2E tests
       working-directory: ./e2e-tests
-      run: npm run test:e2e
+      run: npm run cypress:run
       env:
-        CYPRESS_baseUrl: http://localhost:3000
-        CYPRESS_apiUrl: http://localhost:3001/api
-    
-    - name: Upload Cypress screenshots
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: cypress-screenshots
-        path: e2e-tests/cypress/screenshots
-    
-    - name: Upload Cypress videos
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: cypress-videos
-        path: e2e-tests/cypress/videos
+        CYPRESS_BASE_URL: ${{ secrets.CYPRESS_BASE_URL }}
+        CYPRESS_API_URL: ${{ secrets.REACT_APP_API_URL }}
 
   notify-success:
     needs: e2e-tests
     runs-on: ubuntu-latest
     if: success()
-    
+
     steps:
     - name: Notify deployment success
       run: |
